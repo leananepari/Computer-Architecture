@@ -72,6 +72,8 @@ class CPU:
         LDI = 0b10000010
         PRN = 0b01000111
         HLT = 0b00000001
+        MUL = 0b10100010
+
         while True:
           IR = self.ram[self.pc]
           operand_a = self.ram_read(self.pc + 1)
@@ -82,6 +84,9 @@ class CPU:
           elif IR == PRN:
             print(self.reg[operand_a])
             self.pc += 2
+          elif IR == MUL:
+            self.reg[operand_a] = self.reg[operand_a] * self.reg[operand_b]
+            self.pc += 3
           elif IR == HLT:
             break
           else:
