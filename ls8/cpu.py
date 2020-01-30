@@ -7,28 +7,30 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        pass
-
-    def load(self):
+        self.ram = [0] * 256
+        self.reg = [0] * 8
+        self.pc = 0
+        self.sp = int('F4', 16)
+    
+    def load(self, filename):
         """Load a program into memory."""
+        try:
+            address = 0
+            with open(filename) as f:
+                for line in f:
+                    # Ignore comments
+                    comment_split = line.split("#")
+                    num = comment_split[0].strip()
+                    if num == "":
+                        continue
 
-        address = 0
+                    value = int(num, 2) #base 2, adds 0b in front
+                    self.ram[address] = value
+                    address += 1
 
-        # For now, we've just hardcoded a program:
-
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
-
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
+        except FileNotFoundError:
+            print(f"{filename} not found")
+            sys.exit(2)
 
 
     def alu(self, op, reg_a, reg_b):
@@ -59,7 +61,102 @@ class CPU:
             print(" %02X" % self.reg[i], end='')
 
         print()
+    
+    def ram_read(self, address):
+      return self.ram[address]
+      
+    def ram_write(self, value, address):
+      self.ram[address] = value
 
     def run(self):
         """Run the CPU."""
-        pass
+
+        LDI = 0b10000010
+        PRN = 0b01000111
+        HLT = 0b00000001
+        MUL = 0b10100010
+        PUSH = 0b01000101
+        POP = 0b01000110
+        CALL = 0b01010000
+        RET = 0b00010001
+        ADD = 0b10100000
+
+       
+        def handle_CALL(operand_a, operand_b):
+          index_to_go = self.reg[operand_a]
+          save_return_index = self.pc + 2
+          self.sp -= 1
+          self.ram[self.sp] = save_return_index
+          self.pc = index_to_go
+        
+        def handle_RET(operand_a, operand_b):
+            self.pc = self.ram[self.sp]
+            self.sp += 1
+        
+        def handle_ADD(operand_a, operand_b, fl=False):
+          value1 = self.reg[operand_a]
+          value2 = self.reg[operand_b]
+          self.reg[operand_a] = value1 + value2
+          self.pc += 3
+        
+        def handle_LDI(operand_a, operand_b, fl=False):
+          self.reg[operand_a] = operand_b
+          self.pc += 3
+        
+        def handle_PRN(operand_a, operand_b=None, fl=False):
+          print(self.reg[operand_a])
+          self.pc += 2
+        
+        def handle_MUL(operand_a, operand_b, fl=False):
+          self.reg[operand_a] = self.reg[operand_a] * self.reg[operand_b]
+          self.pc += 3
+        
+        def handle_PUSH(operand_a=None, operand_b=None, fl=False):
+          reg = self.ram_read(self.pc + 1)
+          val = self.reg[reg]
+          self.sp -= 1
+          self.ram[self.sp] = val
+          self.pc += 2
+
+        def handle_POP(operand_a=None, operand_b=None, fl=False):
+          reg = self.ram[self.pc + 1]
+          val = self.ram[self.sp]
+          self.reg[reg] = val
+          self.sp += 1
+          self.pc += 2
+
+
+        dispatch = {
+          LDI: handle_LDI,
+          PRN: handle_PRN,
+          MUL: handle_MUL,
+          PUSH: handle_PUSH,
+          POP: handle_POP,
+          CALL: handle_CALL,
+          RET: handle_RET,
+          ADD: handle_ADD
+        }
+
+        while True:
+          IR = self.ram[self.pc]
+          operand_a = self.ram_read(self.pc + 1)
+          operand_b = self.ram_read(self.pc + 2)
+
+          if IR == HLT:
+            break
+          else:
+            if dispatch[IR]:
+              dispatch[IR](operand_a, operand_b)
+            else:
+              print(f"Error: Unknown command: {IR}")
+              break
+
+
+cpu = CPU()
+
+# cpu.load()
+# cpu.trace()
+# cpu.run()
+# print('REG ', cpu.reg)
+
+# print('NUM ', 0b10100000)
